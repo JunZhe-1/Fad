@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block content %}
+    {% from "includes/_formHelper.html" import render_field %}
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-image: url("{{ url_for('static', filename='wall4.jpg') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .form-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            box-shadow: 0px 4px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .form-container h2 {
+            font-size: 30px;
+            font-weight: bold;
+            text-align: center;
+            color: black;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            font-size: 16px;
+            font-weight: bold;
+            color: black;
+            text-align: right;
+        }
+
+        .input-group .form-control {
+            border-radius: 25px;
+            border: solid;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+        }
+
+        .save-btn {
+            background-color: #E8E8E8;
+            color: #000;
+            border: none;
+            padding: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border-radius: 25px;
+            display: block;
+            margin-top: 25px;
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .save-btn:hover {
+            background-color: #89CFF0;
+        }
+
+        label {
+            color: black;
+        }
+
+        @media (max-width: 767px) {
+            .form-group label {
+                text-align: left;
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="form-container">
+                    <h2>Register</h2>
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                      {% if messages %}
+                        {% for category, message in messages %}
+                          <div class="alert alert-{{ category }}">
+                            {{ message }}
+                          </div>
+                        {% endfor %}
+                      {% endif %}
+                    {% endwith %}
+                    <form method="POST" action="{{ url_for('register') }}">
+                        {{ form.hidden_tag() }}
+
+                        <!-- Username Field -->
+                        <div class="input-group">
+                            {{ form.username.label }}
+                            {{ form.username(class="form-control") }}
+                            {% if form.username.errors %}
+                                <div class="text-danger">{{ form.username.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Email Field -->
+                        <div class="input-group">
+                            {{ form.email.label }}
+                            {{ form.email(class="form-control") }}
+                            {% if form.email.errors %}
+                                <div class="text-danger">{{ form.email.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Password Field -->
+                        <div class="input-group">
+                            {{ form.password.label }}
+                            {{ form.password(class="form-control", id="password") }}
+                            {% if form.password.errors %}
+                                <div class="text-danger">{{ form.password.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Confirm Password Field -->
+                        <div class="input-group">
+                            {{ form.confirm_password.label }}
+                            {{ form.confirm_password(class="form-control", id="confirm_password") }}
+                            {% if form.confirm_password.errors %}
+                                <div class="text-danger">{{ form.confirm_password.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Password Complexity Checkboxes -->
+                        <div id="password-requirements">
+                            <label><input type="checkbox" id="min-length" disabled> Minimum 8 Characters</label><br>
+                            <label><input type="checkbox" id="upper-case" disabled> Uppercase Letter</label><br>
+                            <label><input type="checkbox" id="lower-case" disabled> Lowercase Letter</label><br>
+                            <label><input type="checkbox" id="number" disabled> Number</label><br>
+                            <label><input type="checkbox" id="special-char" disabled> Special Character</label>
+                        </div>
+                        <button type="submit" class="save-btn" id="register-btn">Register</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script for Password Complexity -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var passwordField = document.getElementById('password');
+        var confirmPasswordField = document.getElementById('confirm_password');
+        var minLengthCheck = document.getElementById('min-length');
+        var upperCaseCheck = document.getElementById('upper-case');
+        var lowerCaseCheck = document.getElementById('lower-case');
+        var numberCheck = document.getElementById('number');
+        var specialCharCheck = document.getElementById('special-char');
+        confirmPasswordField.disabled = true;
+
+        function validatePassword() {
+            var password = passwordField.value;
+
+            // Debug statement to log the current password
+            console.log('Current password:', password);
+
+            // Password validation & Update checkboxes
+            minLengthCheck.checked = password.length >= 8;
+            upperCaseCheck.checked = /[A-Z]/.test(password);
+            lowerCaseCheck.checked = /[a-z]/.test(password);
+            numberCheck.checked = /\d/.test(password);
+            specialCharCheck.checked = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+            // Debug statement to log validation checks
+            console.log('Password validation checks:', {
+                minLength: minLengthCheck.checked,
+                upperCase: upperCaseCheck.checked,
+                lowerCase: lowerCaseCheck.checked,
+                number: numberCheck.checked,
+                specialChar: specialCharCheck.checked
+            });
+
+            var allValid = minLengthCheck.checked && upperCaseCheck.checked && lowerCaseCheck.checked && numberCheck.checked && specialCharCheck.checked;
+            confirmPasswordField.disabled = !allValid;
+
+            // Debug statement to log whether confirm password is enabled
+            console.log('Confirm password enabled:', !confirmPasswordField.disabled);
+        }
+
+
+        // Debug statement to confirm event listener setup
+        console.log('Event listener for password input added.');
+
+        passwordField.addEventListener('input', validatePassword);
+    });
+</script>
+
+{% endblock %}

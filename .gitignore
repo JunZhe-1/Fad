@@ -1,0 +1,9 @@
+data/*
+!data/README.md
+outputs/
+inference_outputs
+test.sh
+*__pycache__/
+
+# Weights and Biases
+wandb/*

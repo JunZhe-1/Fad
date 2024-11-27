@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Camera View{% endblock %}
+
+{% block content %}
+<br>
+<div class="video-feed-container">
+    <img src="{{ url_for('video_feed') }}" class="full-screen-video" alt="Video Feed">
+</div>video_feed
+<br>
+<style>
+/* Reset default margins and paddings */
+body, html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrolling */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header and Footer styles */
+.header, .footer {
+    flex: 0 0 auto; /* Take as much space as needed, but not more */
+    text-align: center;
+    background-color: #333; /* Or any other color you prefer */
+    color: white;
+    padding: 10px 0; /* Adjust the padding as needed */
+}
+
+/* Video Feed container */
+.video-feed-container {
+    flex: 1; /* Fill the remaining vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: black; /* Clean background color */
+    padding-bottom: 20px; /* Add padding to the bottom for spacing */
+}
+
+/* Video Feed styles */
+.full-screen-video {
+    max-width: 100%; /* Ensure the video does not exceed its original size */
+    max-height: 100%; /* Ensure the video does not exceed its original size */
+    width: auto;
+    height: auto;
+    object-fit: contain; /* Ensures the video fits inside its container without distortion */
+    margin-bottom: 20px; /* Add margin to the bottom for spacing */
+}
+</style>
+
+{% endblock %}

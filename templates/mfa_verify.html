@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}MFA Verification{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h2>MFA Verification</h2>
+        <p>Please enter the 6-digit authentication code sent to your email.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div>
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('mfa_verify') }}">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.code.label(class="form-label") }}
+                {{ form.code(class="form-control") }}
+                {% if form.code.errors %}
+                    <div class="text-danger">{{ form.code.errors[0] }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary">Verify</button>
+        </form>
+    </div>
+{% endblock %}

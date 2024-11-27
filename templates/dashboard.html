@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 style="text-align: center; margin-top: 20px; font-size: 32px; font-weight: bold;">DASHBOARD</h1>
+<hr style="border: none; border-top: 2px solid #ddd; margin-bottom: 20px;">
+
+<div class="centered">
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card card-blue shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #fff;">
+                        First Feeding Time
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-light">
+                        {% for id in id_array %}
+                        {{ id.get_first_timer() }}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card card-orange shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #fff;">
+                        Second Feeding Time
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-light">
+                        {% for id in id_array %}
+                        {{ id.get_second_timer() }}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card card-green shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #fff;">
+                        First Feed Amount (grams)
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-light">
+                        {% for id in id_array %}
+                        {{ id.get_pellets() }}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card card-red shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #fff;">
+                        Feeding Duration
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-light">
+                        {% for id in id_array %}
+                        Stop feeding after {{ id.get_seconds() }} seconds
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart Area -->
+<div class="centered mt-5">
+    <!-- Chart Canvas -->
+    <div class="mt-4 chart-container">
+        <h2>LEFTOVER PELLETS FOR THE PAST WEEK (by feeding time)</h2>
+        <canvas id="pelletChart" width="600" height="400"></canvas>
+        <br>
+        <button id="firstFeedBtn" class="styled-button me-2" onclick="updateChart('first_feed',data)">First Feed</button>
+        <button id="secondFeedBtn" class="styled-button" onclick="updateChart('second_feed',data)">Second Feed</button>
+    </div>
+
+    <div class="mt-4 chart-container">
+        <h2>TOTAL LEFTOVER PELLETS FOR THE PAST WEEK </h2>
+        <canvas id="totalPelletChart" width="600" height="400"></canvas>
+        <br>
+        <button class="styled-button" onclick="exportTotalFeedData()">Export Data</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let chart, totalChart,data;
+
+    // Function to update chart data dynamically
+    function updateChart(feedType, data) {
+        if (feedType === 'first_feed') {
+            chart.data.datasets[0].data = data["first_feed"];
+        } else if (feedType === 'second_feed') {
+            chart.data.datasets[0].data = data["second_feed"];
+        }
+        chart.update();
+    }
+
+    // Fetch data from the server and initialize the charts
+    async function fetchAndInitializeCharts() {
+        try {
+            const labels = {{ pellet_labels|tojson }};
+            const firstFeedData = {{ first_feed|tojson }};
+            const secondFeedData = {{ second_feed|tojson }};
+            console.log(secondFeedData)
+
+            // Initialize the first chart (Pellet Chart)
+            const ctx = document.getElementById('pelletChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'labels',
+                        data: firstFeedData,  // Default data is the first feed
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Initialize the second chart (Total Pellet Chart)
+            const totalFeedData = firstFeedData.map((val, idx) => val + secondFeedData[idx]|| 0);
+            const ctx2 = document.getElementById('totalPelletChart').getContext('2d');
+            totalChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Pellet Count',
+                        data: totalFeedData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Set the default chart to display first feed data
+            data = {
+            "first_feed": firstFeedData ,
+            "second_feed": secondFeedData,
+            }
+            updateChart('first_feed', data);
+            console.log('First Feed Data:', firstFeedData);
+            console.log('Second Feed Data:', secondFeedData);
+            console.log('Data Object:', data);
+            console.log('Total Feed Data:', totalFeedData);
+        } catch (error) {
+            console.error('Error fetching pellet data:', error);
+        }
+    }
+
+    // Load the charts when the page is ready
+    window.onload = function () {
+        fetchAndInitializeCharts();
+    };
+
+    // Function to handle data export for total feed chart
+    function exportTotalFeedData() {
+        fetch('/export_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                labels: chart.data.labels,
+                data: totalChart.data.datasets[0].data
+            })
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'leftover_feed_data.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
+        .catch(error => {
+            console.error('Error exporting data:', error);
+        });
+    }
+</script>
+
+<style>
+body {
+    background-color: #2f3136;
+    color: #ffffff;
+    font-family: 'Arial', sans-serif;
+}
+
+h1 {
+    font-size: 32px;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+    margin-top: 20px;
+}
+
+h2 {
+    font-size: 18px;
+    color: white;
+    text-align: center;
+    margin-top: 20px;
+}
+
+hr {
+    border: none;
+    border-top: 2px solid #555;
+    margin-bottom: 20px;
+}
+
+.centered {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.card {
+    background-color: #393d45;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: scale(1.05);
+}
+
+.card-blue {
+    border-left: 5px solid #0096FF;
+}
+
+.card-orange {
+    border-left: 5px solid #f39c12;
+}
+
+.card-green {
+    border-left: 5px solid #2ecc71;
+}
+
+.card-red {
+    border-left: 5px solid #e74c3c;
+}
+
+.card .card-body {
+    color: #ffffff;
+}
+
+.card .card-body .text-xs {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #ddd;
+}
+
+.card .card-body .h5 {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.styled-button {
+    background-color: #3498db;
+    color: #ffffff;
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-right: 10px;
+}
+
+.styled-button:hover {
+    background-color: #2980b9;
+    transform: scale(1.05);
+}
+
+.styled-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.styled-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5);
+}
+
+.chart-container {
+    background-color: #393d45;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin-top: 20px;
+}
+
+canvas {
+    background-color: white;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+@media (max-width: 767px) {
+    .col-xl-3, .col-md-6 {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+</style>
+
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Feeding Settings{% endblock %}
+
+{% block content %}
+    {% from "includes/_formHelper.html" import render_field %}
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #2f3136;
+            background-position: center;
+            background-repeat: no-repeat;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .form-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: #393d45;
+            border-radius: 5px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .form-container h2 {
+            font-size: 30px;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-align: right;
+        }
+
+        .form-group .form-field-wrapper {
+            margin-bottom: 15px;
+        }
+
+        .form-group .form-field-wrapper input {
+            width: 100%;
+            height: 45px;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 25px;
+            border: solid;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+        }
+
+        .save-btn {
+            background-color: #E8E8E8;
+            color: #000;
+            border: none;
+            padding: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            border-radius: 25px;
+            display: block;
+            margin-top: 25px;
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+
+        .save-btn:hover {
+            background-color: #C8C8C8;
+        }
+
+        @media (max-width: 767px) {
+            .form-group label {
+                text-align: left;
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="form-container">
+                    <h2>Feeding Settings</h2>
+
+                    <form method="POST" action="">
+                        {{ form.csrf_token }}
+                        <div class="form-group row">
+                            <label for="first_timer" class="col-md-4 col-form-label">First Timer:</label>
+                            <div class="col-md-8 form-field-wrapper">
+                                {{ render_field(form.first_timer, class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="second_timer" class="col-md-4 col-form-label">Second Timer:</label>
+                            <div class="col-md-8 form-field-wrapper">
+                                {{ render_field(form.second_timer, class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="pellets" class="col-md-4 col-form-label">Feed Amount (grams):</label>
+                            <div class="col-md-8 form-field-wrapper">
+                                {{ render_field(form.pellets, class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="seconds" class="col-md-4 col-form-label">Feeding Duration(sec):</label>
+                            <div class="col-md-8 form-field-wrapper">
+                                {{ render_field(form.seconds, class="form-control") }}
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label for="confidence" class="col-md-4 col-form-label">Confidence Rate:</label>
+                            <div class="col-md-8 form-field-wrapper">
+                                {{ render_field(form.confidence, class="form-control") }}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="save-btn">Save</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

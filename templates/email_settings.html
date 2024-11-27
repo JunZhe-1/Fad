@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Library Loan System - Home{% endblock %}
+
+{% block content %}
+{% from "includes/_formHelper.html" import render_field %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+
+<style>
+    * {
+        font-family: Times New Roman;
+        color:black;
+    }
+
+    .label p b {
+        color: #224847;
+    }
+
+    .label {
+        display: flex;
+justify-content: center;
+        text-align: center;
+        align-items: center;
+        padding: 30px;
+        margin-left:-10px;
+    }
+
+    .form-field-wrapper input {
+        width: 400px;
+        height: 35px;
+        margin-left: 30px;
+        font-size: 20px;
+        margin-top:-25px;
+    }
+
+    form {
+        width: 100%;
+        text-align: center;
+        margin-top: 25px;
+    }
+
+    .info b {
+        font-size: 20px;
+    }
+
+ .custom-tooltip {
+        border-bottom: 1px dotted black;
+        color: black;
+        padding: 3px 5px; /* Add padding for better appearance */
+        display: inline-block; /* Ensure the element takes up space even without content */
+        position: relative; /* Add position relative for absolute positioning */
+    }
+
+    .custom-tooltip .tooltiptext {
+        visibility: hidden;
+        width: 550px;
+        background-color: #555;
+        color: #fff;
+        font-size:14px;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px 0;
+        position: absolute;
+        z-index: 1;
+        top: 110%;
+        left: -50%;
+        margin-left: -200px;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .custom-tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+</style>
+
+<body>
+    <div style="width: 100%; text-align: center; margin-top:30px;">
+        <div style="border-bottom: 2px solid #224847; width: 35%; margin: 0 auto;">
+            <p style="font-size: 30px; font-weight: bold; text-align: center; color:#224847;">Email Settings</p>
+        </div>
+    </div>
+
+    <form method="POST" action="">
+
+
+   <div class="label" style="margin-left:45px;">
+    <p class="info"><b>Device's Email:</b></p>
+    <div class="form-field-wrapper">
+        {{ render_field(form.sender_email, class="form-control") }}
+    </div>
+    <div class="custom-tooltip" style="display: inline-block; margin-left:18px;"> <!-- Set display to inline-block -->
+        <i class="fas fa-question-circle"></i> <!-- Help icon -->
+        <span class="tooltiptext">The email must be the same as the email address associated with your current laptop,<br> granting permission for the website to send emails automatically.</span>
+    </div>
+</div>
+
+
+
+
+
+
+
+        <div class="label">
+            <p class="info"><b>Recipient Email: </b></p>
+            <div class="form-field-wrapper">
+                {{ render_field(form.recipient_email, class="form-control") }}
+
+            </div>
+        </div>
+
+        <div class="label" style="margin-left: -4px;">
+            <p class="info"><b>App Passwords: </b></p>
+            <div class="form-field-wrapper">
+                {{ render_field(form.App_password, class="form-control") }}
+            </div>
+        </div>
+
+        <div class="label" style="margin-left:5px;">
+            <p class="info"><b>Comparison Days: &nbsp;&nbsp;</b></p>
+            <div class="form-field-wrapper">
+                {{ render_field(form.days, class="form-control") }}
+            </div>
+              <div class="custom-tooltip" style="display: inline-block; margin-left:18px;"> <!-- Set display to inline-block -->
+        <i class="fas fa-question-circle"></i> <!-- Help icon -->
+        <span class="tooltiptext">How many consecutive days of decreasing fish feeding duration should occur<br> before sending a notification email to the recipient? </span>
+    </div>
+        </div>
+
+        <button class="save-btn" onclick="handleClick()" >Save</button>
+    </form>
+
+    <script>
+
+
+    </script>
+
+</body>
+</html>
+{% endblock %}

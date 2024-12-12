@@ -1,11 +1,15 @@
 # Flask-related imports #
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, jsonify, send_file, session
+from openpyxl.styles.builtins import total
+from sympy import false
 from wtforms import Form, StringField, RadioField, SelectField, TextAreaField, validators, ValidationError, PasswordField
 import sys
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user
 import shelve, re
 from flask_wtf import FlaskForm
+from wtforms.validators import email
+
 from Forms import configurationForm, emailForm, LoginForm, RegisterForm, MFAForm, FeedbackForm
 from flask_mail import Mail, Message
 import random
@@ -160,6 +164,8 @@ def check_feeding_time():
 
     setting = Time_Record_dict.get('Time_Record_Info')
 
+
+
     hours, minutes = setting.get_first_timer().split(':')
     hours1, minutes1 = setting.get_second_timer().split(':')
 
@@ -209,42 +215,54 @@ def process_frames():
     global latest_processed_frame
     global feeding
     global feeding_timer
-    db = shelve.open('settings.db', 'w')
-    Time_Record_dict = db['Time_Record']
-    db.close()
-
-    setting = Time_Record_dict.get('Time_Record_Info')
-
-    hours, minutes = setting.get_first_timer().split(':')
-    hours1, minutes1 = setting.get_second_timer().split(':')
-
-    first_feeding_time = int(hours)
-    first_feeding_time_min = int(minutes)
-    second_feeding_time = int(hours1)
-    second_feeding_time_min = int(minutes1)
-
-    confidence = float(setting.get_confidence())/100
 
     showing_timer = None
     line_chart_timer, email_TF = (None,False)
     desired_time = None
 
     formatted_desired_time = None
-    current_datetime = datetime.now()
+
     frame_counter = 0  # Counter to track frames
     while True:
+        db = shelve.open('settings.db', 'w')
+        Time_Record_dict = db['Time_Record']
+        checking_interval = db.get('Check_Interval', 60)
+        db.close()
+
+        setting = Time_Record_dict.get('Time_Record_Info')
+
+        hours, minutes = setting.get_first_timer().split(':')
+        hours1, minutes1 = setting.get_second_timer().split(':')
+
+        first_feeding_time = int(hours)
+        first_feeding_time_min = int(minutes)
+        second_feeding_time = int(hours1)
+        second_feeding_time_min = int(minutes1)
+
+        # change confidence from here.
+        confidence = float(setting.get_confidence()) / 100
+        current_datetime = datetime.now()
         bounding_boxes = []
         # Process the predictions and update object count
         temp_object_count = {1: 0}  # Initialize count for the current frame
-
+        total_count = 0
         frame_counter += 1
-        if frame_counter % 3 != 0:  # Skip 2 out of every 3 frames
-            time.sleep(0.03)
-            continue
+
+        # Process only every 5 seconds
+        if frame_counter % 5 == 0:
+            print("Processing a frame...")
+
+
+
+        # Pause for 1 second on each iteration
+
+        time.sleep(30)
         current_time = datetime.now().time()
-        if (current_time.hour == first_feeding_time or current_time.hour == second_feeding_time) and (current_time.minute == first_feeding_time_min or current_time.minute == second_feeding_time_min) and current_time.second == 0:
+
+        if (current_time.hour == first_feeding_time and current_time.minute == first_feeding_time_min  ) or( current_time.hour == second_feeding_time and current_time.minute == second_feeding_time_min ) :
             with feeding_lock:
                 feeding = True
+                print("feeding set")
             feeding_timer = None
             showing_timer = None
             line_chart_timer = time.time()
@@ -291,9 +309,25 @@ def process_frames():
             # Check feeding timer and switch to stop feeding if required
             if feeding_timer is not None and feeding:
                 elapsed_time = (time.time() - feeding_timer)
+                if total_time:
+                    total_time += elapsed_time
+                else:
+                    total_time = elapsed_time
                 print( f'elapsed time: {elapsed_time:.3f}' )
                 with object_count_lock:
-                    if elapsed_time > int(setting.get_seconds()) and sum(object_count.values()) > int(setting.get_pellets()):
+                    # check if the is the time to check
+                    if elapsed_time > checking_interval and total_time < int(setting.get_seconds()):
+                        if int(temp_object_count[1]) < int(setting.get_pellets()):
+                            total_count += int(setting.get_pellets())
+                            feeding_timer = time.time()
+                            continue
+                            # feed
+                        else:
+                            feeding_timer = time.time()
+                            #skip feed
+                            continue
+
+                    if total_time > int(setting.get_seconds()) and sum(object_count.values()) !=0:
                         with feeding_lock:
                             feeding = False
                         feeding_timer = None
@@ -326,20 +360,13 @@ def process_frames():
 
                         line_chart_timer = None
 
-                        db = shelve.open('line_chart_data.db', 'w')
-                        Line_Chart_Data_dict = db['Line_Chart_Data']
+                        db = shelve.open('mock_chart_data.db', 'w')
+                        current_date = datetime.today().strftime("%d %b %Y")
 
-                        current_date = datetime.today().strftime("%Y-%m-%d")
-
-                        if current_date in Line_Chart_Data_dict:
-                            Line_chart_objects = Line_Chart_Data_dict.get(current_date)
-                            Line_chart_objects.set_timeRecord(j + Line_chart_objects.get_timeRecord())
-                            Line_Chart_Data_dict[current_date] = Line_chart_objects
+                        if current_date in db.keys():
+                            db[current_date]+=object_count[1]
                         elif current_date not in Line_Chart_Data_dict:
-                            print(current_time," is not in the dictionary. creating a new one...")
-                            new_object = Line_Chart_Data(current_date, j)
-                            Line_Chart_Data_dict[current_date] = new_object
-                        db['Line_Chart_Data'] = Line_Chart_Data_dict
+                            db[current_date] = object_count[1]
                         db.close()
 
                         if (current_time.hour >= first_feeding_time) and (current_time.hour >=second_feeding_time and current_time.minute >second_feeding_time_min):
@@ -394,9 +421,16 @@ def process_frames():
             with latest_processed_frame_lock:
                 latest_processed_frame = frame
 
+@login_required
 def generate_frames():
     global latest_processed_frame, frame_data
+    count = 1
     while not stop_event.is_set():
+        if count //60 == 0:
+            db = shelve.open('settings.db', 'r')
+            if not db.get('Generate_Status',True):
+                print("stopped generating")
+                break
         with latest_processed_frame_lock:
             frame = latest_processed_frame.copy()  # Create a copy of the frame to avoid modification of original
         if frame is not None:
@@ -437,6 +471,7 @@ scheduler.start()
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USERNAME'] = '2931801324qq@gmail.com'
+app.config['MAIL_DEFAULT_SENDER'] = ('Admin', '2931801324qq@gmail.com')
 app.config['MAIL_PASSWORD'] = 'qqmr eawg svut gysf'
 app.config['MAIL_USE_TLS'] = False
 app.config['MAIL_USE_SSL'] = True
@@ -535,15 +570,14 @@ def login():
                         session['email'] = user_email  # Save email in session
                         session['mfa_code'] = mfa_code  # Store in session
                         session['username'] = username  # Save username for next steps
-
+                        session['access_video_feed'] = True
                         # Send the code via email
                         msg = Message('MFA Code',
-                                        sender='2931801324qq@gmail.com',
                                         recipients=[user_email])
                         msg.body = f'Your 6-digit MFA code is {mfa_code}'
                         try:
                             print(mfa_code)
-                            #mail.send(msg)
+                            # mail.send(msg)
                             flash('An authentication code has been sent to your email.', 'info')
                         except:
                             flash('Error sending MFA', 'danger')
@@ -569,6 +603,11 @@ def mfa_verify():
         if entered_code == session.get('mfa_code'):
             # MFA passed, log the user in
             username = session.get('username')
+            with shelve.open('settings.db','w') as db:
+                email_dict = db.get("Email_Data")
+                email_instance = email_dict.get("Email_Info")
+                email_instance.set_recipient_email(session['email'])
+
 
             # Use context manager to ensure the shelf is properly opened and closed
             with shelve.open('users.db', 'r') as db:
@@ -702,10 +741,13 @@ def get_pellet_data():
         '18 Nov 2024': {'8:05 AM': 31, '6:05 PM': 40},
         '19 Nov 2024': {'8:05 AM': 30, '6:05 PM': 39},
         '20 Nov 2024': {'8:05 AM': 28, '6:05 PM': 36},
-        '21 Nov 2024': {'8:05 AM': 33, '6:05 PM': 42},
-        '22 Nov 2024': {'8:05 AM': 29, '6:05 PM': 41},
-        '23 Nov 2024': {'8:05 AM': 30, '6:05 PM': 38},
-        '24 Nov 2024': {'8:05 AM': 32, '6:05 PM': 35}
+        '27 Nov 2024': {'8:05 AM': 33, '6:05 PM': 42},
+        '28 Nov 2024': {'8:05 AM': 29, '6:05 PM': 41},
+        '29 Nov 2024': {'8:05 AM': 30, '6:05 PM': 38},
+        '30 Nov 2024': {'8:05 AM': 32, '6:05 PM': 35},
+        '01 Dec 2024': {'8:05 AM': 34, '6:05 PM': 35},
+        '02 Dec 2024': {'8:05 AM': 31, '6:05 PM': 35},
+        '03 Dec 2024': {'8:05 AM': 25, '6:05 PM': 30},
     }
 
     # Check if the database exists, and if not, create and populate it
@@ -719,7 +761,7 @@ def get_pellet_data():
 
     # Generate the last 7 days (including today)
     current_day = datetime.today().date()
-    last_7_days = [(current_day - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, 8)]
+    last_7_days = [(current_day - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7, 0,-1)]
 
     # Initialize lists to hold pellet counts
     first_feed_counts = []
@@ -737,8 +779,8 @@ def get_pellet_data():
 
     response_data = {
         'labels': [datetime.strptime(day, "%Y-%m-%d").strftime("%d %b") for day in last_7_days],
-        'first_feed': first_feed_counts,
-        'second_feed': second_feed_counts,
+        'first_feed_left': first_feed_counts,
+        'second_feed_left': second_feed_counts,
     }
 
     return jsonify(response_data)
@@ -760,10 +802,11 @@ def dashboard():
     pellet_data = response.get_json()  # Convert the Flask Response to JSON
 
     return render_template('dashboard.html', count=len(id_array), id_array=id_array, edit=0, form=edit_form,
-                           pellet_labels=pellet_data['labels'],first_feed=pellet_data['first_feed'],second_feed=pellet_data['second_feed'])
+                           pellet_labels=pellet_data['labels'],first_feed_left=pellet_data['first_feed_left'],second_feed_left=pellet_data['second_feed_left'])
 
 @app.route('/camera_view',methods=['GET','POST'])
 def camera_view():
+    session['access_video_feed'] = True
     return render_template('camera_view.html')
 
 @app.route('/export_data', methods=['POST'])
@@ -771,7 +814,9 @@ def export_data():
     # Get data from the request
     data = request.get_json()
     labels = data.get('labels', [])
-    values = data.get('data', [])
+    first = data.get('first', [])
+    second = data.get('second', [])
+    total = data.get('total', [])
 
     # Create an Excel workbook and worksheet
     workbook = openpyxl.Workbook()
@@ -780,14 +825,20 @@ def export_data():
 
     # Set up the header
     sheet["A1"] = "Date"
-    sheet["B1"] = "Number of pellets"
+    sheet["B1"] = "first feed number of pellets left"
+    sheet["C1"] = "second feed number of pellets left"
+    sheet["D1"] = "total feed pellets fed"
     sheet["A1"].font = Font(bold=True)
     sheet["B1"].font = Font(bold=True)
+    sheet["C1"].font = Font(bold=True)
+    sheet["D1"].font = Font(bold=True)
 
     # Populate the worksheet with data
-    for index, (label, value) in enumerate(zip(labels, values), start=2):
+    for index, (label, first,second,total) in enumerate(zip(labels, first,second,total), start=2):
         sheet[f"A{index}"] = label
-        sheet[f"B{index}"] = value
+        sheet[f"B{index}"] = first
+        sheet[f"C{index}"] = second
+        sheet[f"D{index}"] = total
 
     # Save the workbook to a file
     file_path = 'consumption_data.xlsx'
@@ -820,10 +871,11 @@ def update_setting():
                 db['Time_Record'] = Time_Record_dict
                 db.close()
 
-                user_email = session.get("user_email")
+                user_email = session.get("email")
                 first_timer = setting.first_timer.data
                 second_timer = setting.second_timer.data
                 feeding_duration = setting.seconds.data
+                print("userEmail:" + user_email)
 
                 schedule_feeding_alerts(first_timer, second_timer, feeding_duration, user_email)
                 return redirect(url_for('dashboard'))
@@ -860,13 +912,84 @@ def send_feeding_complete_email(user_email, feed_time):
             msg = Message("Feeding Complete",
                           recipients=["yeapjunzhe616@outlook.com"],
                           body= f"The {feed_time} has been completed",
-                          sender=("Admin", "2931801324qq@gmail.com")
                           )
             msg.body = f"The {feed_time} has been completed."
             mail.send(msg)
             print(f"Email sent to {user_email} for {feed_time}.")
         except Exception as e:
             print(f"Error sending email: {e}")
+
+
+def reschedule_feeding_alerts():
+    db = shelve.open('settings.db', 'r')
+    Time_Record_dict = db['Time_Record']
+    j = Time_Record_dict.get('Time_Record_Info')
+
+
+    # Get updated times and durations
+    first_timer = j.get_first_timer()
+    second_timer = j.get_second_timer()
+    feeding_duration = j.get_seconds()
+    try:
+        user_email = session.get("email")
+    except:
+        db = shelve.open('settings.db', 'r')
+        email_db = db.get("Email_Data", {"Email_Info":Email("2931801324qq@gmail.com","yeapjunzhe616@outlook.com",'qqmr eawg svut gysf',3)})
+        email_instance = email_db.get("Email_Info")
+        user_email = email_instance.get_recipient_email()
+        print("reschedule"+ user_email)
+
+    # Calculate new run_date for the first alert (next day)
+    now = datetime.now()
+    timezone = pytz.timezone("Asia/Singapore")
+    first_timer_dt = now.replace(hour=int(first_timer[:2]), minute=int(first_timer[3:]), second=0, microsecond=0)
+    first_end_time = timezone.localize(first_timer_dt + timedelta(seconds=feeding_duration))
+    # Reschedule the feeding alerts for the next day
+
+    # Modify the existing job with the new run_date
+    job = scheduler.get_job('first_feeding_alert')  # Retrieve the existing job by its ID
+    if job:
+        job.modify(run_date=first_end_time)  # Reschedule the job for the new time
+    else:
+        scheduler.add_job(
+            func=send_feeding_complete_email,
+            trigger='date',
+            run_date=first_end_time,
+            args=[user_email, "first feeding complete"],
+            id='first_feeding_alert',
+            misfire_grace_time=3600  # Allow a 1-hour grace period for missed jobs
+        )
+        print("No job found with this ID!")
+
+    # Repeat the process for the second timer
+    second_timer_dt = now.replace(hour=int(second_timer[:2]), minute=int(second_timer[3:]), second=0, microsecond=0)
+    second_end_time = timezone.localize(second_timer_dt + timedelta(seconds=feeding_duration))
+
+    # Modify the second feeding alert job
+    job = scheduler.get_job('second_feeding_alert')  # Retrieve the existing job by its ID
+    if job:
+        job.modify(run_date=second_end_time)  # Reschedule the job for the new time
+    else:
+        scheduler.add_job(
+            func=send_feeding_complete_email,
+            trigger='date',
+            run_date=second_end_time,
+            args=[user_email, "second feeding complete"],
+            id='second_feeding_alert',
+            misfire_grace_time=3600  # Allow a 1-hour grace period for missed jobs
+        )
+        print("No job found with this ID2!")
+
+
+def schedule_daily_task():
+    while True:
+        print("Updating schedule")
+        reschedule_feeding_alerts()  # Execute the function
+        time.sleep(86400)  # Wait for 24 hours (86400 seconds)
+
+
+
+
 
 def schedule_feeding_alerts(first_timer, second_timer, feeding_duration, user_email):
     try:
@@ -886,32 +1009,51 @@ def schedule_feeding_alerts(first_timer, second_timer, feeding_duration, user_em
             print("First feeding time is in the past. Skipping scheduling.")
         else:
             print("Scheduling first feeding alert at:", first_end_time)
+            existing_job = scheduler.get_job('first_feeding_alert')
+
+            if existing_job:
+                # Reschedule the existing job
+                scheduler.remove_job('first_feeding_alert')
+
+            # Add the job if it doesn't exist
             scheduler.add_job(
-                func=send_feeding_complete_email,
-                trigger='date',
-                run_date=first_end_time,
-                args=[user_email, "first feeding complete"],
-                id='first_feeding_alert',
-                misfire_grace_time=3600  # Allow a 1-hour grace period for missed jobs
-            )
+                    func=send_feeding_complete_email,
+                    trigger='date',
+                    run_date=first_end_time,
+                    args=[user_email, "first feeding complete"],
+                    id='first_feeding_alert',
+                    misfire_grace_time=3600  # Allow a 1-hour grace period for missed jobs
+                )
+            print("Job 'first_feeding_alert' added.")
 
         if second_end_time < timezone.localize(now):
             print("Second feeding time is in the past. Skipping scheduling.")
         else:
             print("Scheduling second feeding alert at:", second_end_time)
+            existing_job = scheduler.get_job('second_feeding_alert')
+
+            if existing_job:
+                # Update the existing job
+                scheduler.remove_job('second_feeding_alert')
+
+
+            # Add a new job if it doesn't exist
             scheduler.add_job(
-                func=send_feeding_complete_email,
-                trigger='date',
-                run_date=second_end_time,
-                args=[user_email, "second feeding complete"],
-                id='second_feeding_alert',
-                misfire_grace_time=3600  # Allow a 1-hour grace period for missed jobs
-            )
+                    func=send_feeding_complete_email,
+                    trigger='date',
+                    run_date=second_end_time,
+                    args=[user_email, "second feeding complete"],
+                    id='second_feeding_alert',
+                    misfire_grace_time=3600
+                )
+            print("Job added.")
 
     except ValueError as e:
         print(f"Error parsing time: {e}")
     except Exception as e:
         print(f"Scheduling error: {e}")
+
+
 
 @app.route('/update/email', methods=['GET', 'POST'])
 def update_email_settings():
@@ -943,8 +1085,20 @@ def update_email_settings():
         setting.days.data = j.get_days()
         return render_template('email_settings.html', form=setting)
 
+
+
+
+@app.route('/clear_video_feed_access', methods=['POST'])
+def clear_video_feed_access():
+    db = shelve.open('settings.db', 'w')
+    db['Generate_Status'] = False
+    db.close()
+
 @app.route('/video_feed')
 def video_feed():
+    db = shelve.open('settings.db', 'w')
+    db['Generate_Status'] = True
+    db.close()
     try:
         return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
     except Exception as e:
@@ -966,7 +1120,7 @@ def feedback():
             msg = Message(
                 subject="New Feedback",
                 sender=user_email,
-                recipients=['2931801324qq@gmail.com'],
+                recipients=[app.config['MAIL_USERNAME']],
                 body=f"Name: {form.name.data}\nEmail: {user_email}\nMessage:\n{form.message.data}"
             )
             mail.send(msg)
@@ -996,6 +1150,13 @@ if __name__ == '__main__':
         # Attempt to get 'Time_Record' from db, if not found, initialize with empty dictionary
         Time_Record_dict = db.get('Time_Record',{})
         Email_dict = db.get('Email_Data', {})
+        Generate_Status = db.get('Generate_Status',False)
+        email_setup = Email_dict['Email_Info']
+        app.config['MAIL_USERNAME'] = email_setup.get_sender_email
+        app.config['MAIL_PASSWORD'] = email_setup.get_APPPassword
+        app.config['MAIL_DEFAULT_SENDER'] = ('admin', email_setup.get_sender_email)
+        # newly added read config email from database
+
         db.close()
 
         db = shelve.open('line_chart_data.db', 'w')
@@ -1039,12 +1200,15 @@ if __name__ == '__main__':
 
         # Start the threads for capturing frames and processing frames
         capture_thread = threading.Thread(target=capture_frames)
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<Set thread >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         inference_thread = threading.Thread(target=process_frames)
+        update_schedule_thread = threading.Thread(target=schedule_daily_task)
 
         # Start the threads
         capture_thread.start()
         time.sleep(2.5)
         inference_thread.start()
+        update_schedule_thread.start()
 
     except:
         # If the file doesn't exist, create a new one
@@ -1052,13 +1216,14 @@ if __name__ == '__main__':
         db = shelve.open('settings.db', 'c')
 
         # create the basic setting for new user
-        setting =Settings('08:30', '18:00', 1, 60,98)
+        setting =Settings('08:30', '18:00', 1, 300,98)
         Time_Record_dict['Time_Record_Info'] = setting
         db['Time_Record'] = Time_Record_dict
-
+        db['Generate_Status'] = False
+        db['Check_Interval'] = 60
         # create the basic email setup for user
         email_sender = '2931801324qq@gmail.com'
-        email_password = 'felu mrhx fkkq zvdr'
+        email_password = 'qqmr eawg svut gysf'
         email_receiver = 'yeapjunzhe123@gmail.com'
         email_setup = Email(email_sender, email_receiver, email_password, 3)
         Email_dict['Email_Info'] = email_setup

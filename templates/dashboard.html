@@ -71,18 +71,10 @@
 
 <!-- Chart Area -->
 <div class="centered mt-5">
-    <!-- Chart Canvas -->
-    <div class="mt-4 chart-container">
-        <h2>LEFTOVER PELLETS FOR THE PAST WEEK (by feeding time)</h2>
-        <canvas id="pelletChart" width="600" height="400"></canvas>
-        <br>
-        <button id="firstFeedBtn" class="styled-button me-2" onclick="updateChart('first_feed',data)">First Feed</button>
-        <button id="secondFeedBtn" class="styled-button" onclick="updateChart('second_feed',data)">Second Feed</button>
-    </div>
 
-    <div class="mt-4 chart-container">
+    <div class="mt-4 chart-container" style="width:80vw">
         <h2>TOTAL LEFTOVER PELLETS FOR THE PAST WEEK </h2>
-        <canvas id="totalPelletChart" width="600" height="400"></canvas>
+        <canvas id="totalPelletChart" width="1000vw" height="400vh"></canvas>
         <br>
         <button class="styled-button" onclick="exportTotalFeedData()">Export Data</button>
     </div>
@@ -90,87 +82,76 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let chart, totalChart,data;
+    let chart,data,mergedChart ;
 
-    // Function to update chart data dynamically
-    function updateChart(feedType, data) {
-        if (feedType === 'first_feed') {
-            chart.data.datasets[0].data = data["first_feed"];
-        } else if (feedType === 'second_feed') {
-            chart.data.datasets[0].data = data["second_feed"];
-        }
-        chart.update();
-    }
 
     // Fetch data from the server and initialize the charts
-    async function fetchAndInitializeCharts() {
-        try {
-            const labels = {{ pellet_labels|tojson }};
-            const firstFeedData = {{ first_feed|tojson }};
-            const secondFeedData = {{ second_feed|tojson }};
-            console.log(secondFeedData)
+   async function fetchAndInitializeCharts() {
+    try {
+        const labels = {{ pellet_labels|tojson }};
+        const firstFeedData = {{ first_feed_left|tojson }};
+        const secondFeedData = {{ second_feed_left|tojson }};
+        const totalFeedData = firstFeedData.map((val, idx) => val + secondFeedData[idx] || 0);
 
-            // Initialize the first chart (Pellet Chart)
-            const ctx = document.getElementById('pelletChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'labels',
-                        data: firstFeedData,  // Default data is the first feed
+        console.log('First Feed Data:', firstFeedData);
+        console.log('Second Feed Data:', secondFeedData);
+        console.log('Total Feed Data:', totalFeedData);
+
+        // Initialize a single chart with three datasets
+        const ctx = document.getElementById('totalPelletChart').getContext('2d');
+        mergedChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'First feed left over',
+                        data: firstFeedData,
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         borderColor: 'rgba(54, 162, 235, 1)',
                         borderWidth: 2
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
-            // Initialize the second chart (Total Pellet Chart)
-            const totalFeedData = firstFeedData.map((val, idx) => val + secondFeedData[idx]|| 0);
-            const ctx2 = document.getElementById('totalPelletChart').getContext('2d');
-            totalChart = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Total Pellet Count',
+                    },
+                    {
+                        label: 'Second feed left over',
+                        data: secondFeedData,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Total Feed amount',
                         data: totalFeedData,
                         backgroundColor: 'rgba(255, 99, 132, 0.2)',
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 2
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            // Optional: Customize tooltips to display additional info
                         }
                     }
+                },
+                scales: {
+                    x: {
+                        stacked: false // Set to false to keep individual bars per label
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
                 }
-            });
-
-            // Set the default chart to display first feed data
-            data = {
-            "first_feed": firstFeedData ,
-            "second_feed": secondFeedData,
             }
-            updateChart('first_feed', data);
-            console.log('First Feed Data:', firstFeedData);
-            console.log('Second Feed Data:', secondFeedData);
-            console.log('Data Object:', data);
-            console.log('Total Feed Data:', totalFeedData);
-        } catch (error) {
-            console.error('Error fetching pellet data:', error);
-        }
+        });
+
+        console.log('Merged Chart Initialized');
+    } catch (error) {
+        console.error('Error fetching pellet data:', error);
     }
+}
 
     // Load the charts when the page is ready
     window.onload = function () {
@@ -185,8 +166,10 @@
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                labels: chart.data.labels,
-                data: totalChart.data.datasets[0].data
+                labels: mergedChart.data.labels,
+                first: mergedChart.data.datasets[0].data,
+                second: mergedChart.data.datasets[1].data,
+                total: mergedChart.data.datasets[2].data,
             })
         })
         .then(response => response.blob())

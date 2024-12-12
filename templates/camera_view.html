@@ -47,5 +47,9 @@ body, html {
     margin-bottom: 20px; /* Add margin to the bottom for spacing */
 }
 </style>
-
+<script>
+        window.addEventListener('beforeunload', () => {
+        navigator.sendBeacon('/clear_video_feed_access');
+    });
+</script>
 {% endblock %}
